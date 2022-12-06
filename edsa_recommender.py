@@ -27,7 +27,7 @@
 """
 # Streamlit dependencies
 import streamlit as st
-
+import pickle
 # Data handling dependencies
 import pandas as pd
 import numpy as np
@@ -39,6 +39,8 @@ from recommenders.content_based import content_model
 
 # Data Loading
 title_list = load_movie_titles('resources/data/movies.csv')
+
+
 
 # App declaration
 def main():
@@ -67,6 +69,7 @@ def main():
         movie_2 = st.selectbox('Second Option',title_list[25055:25255])
         movie_3 = st.selectbox('Third Option',title_list[21100:21200])
         fav_movies = [movie_1,movie_2,movie_3]
+
 
         # Perform top-10 movie recommendation generation
         if sys == 'Content Based Filtering':
@@ -102,7 +105,10 @@ def main():
     # ------------- SAFE FOR ALTERING/EXTENSION -------------------
     if page_selection == "Solution Overview":
         st.title("Solution Overview")
-        st.write("Describe your winning approach on this page")
+        st.subheader("**This is the general overview of how the predict was approached**")
+        st.markdown(""" The dataset that was used in the predict was obtained from MovieLens movie recomemdation service. It contains several millions 5 star ratings. Amongst the dataset, all of which were in a CSV format, we had Movies Data File structure (movies.csv), Links Data File Structre (links.csv), Tag Genome (genome-scores.csv and genome-tags.csv). The data was loaded and EDA performed. Upon conclusion of the EDA, feature engineering was perfomed. In feature engineering, the first step perfomed was to concatinate and normalization of the data.A function was written to extract the "All Time Top 20 Movies" by ratings.
+
+           """)
 
     # You may want to add more sections here for aspects such as an EDA,
     # or to provide your business pitch.
