@@ -28,142 +28,82 @@
 """
 
 # Script dependencies
-import os
 import pandas as pd
-import numpy as np
-from sklearn.metrics.pairwise import cosine_similarity
-from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.preprocessing import MultiLabelBinarizer
+
+
 
 # Importing data
 movies = pd.read_csv('resources/data/movies.csv', sep = ',')
 ratings = pd.read_csv('resources/data/ratings.csv')
-imdb = pd.read_csv('resources/data/imdb_data.csv')
 movies.dropna(inplace=True)
 
-def data_preprocessing(subset_size):
-    """Prepare data for use within Content filtering algorithm.
 
+def data_preprocessing(data):
+    """ Preprocess data for use within for content-based filtering algorithm.
     Parameters
     ----------
     subset_size : int
         Number of movies to use within the algorithm.
-
     Returns
     -------
     Pandas Dataframe
         Subset of movies selected for content-based filtering.
-
     """
-    df = pd.merge(movies,imdb, on = 'movieId', how = 'left')
-    df.drop(columns=['runtime', 'budget'], axis=1, inplace=True)
+    movies = data.copy()
+    # Separate genre using a ',' instead of '|'.
+    movies['bag_of_words'] = movies['genres'].str.replace('|', ' ')
 
-        #Ensure all datatypes are strings
-
-    cols = ['title_cast', 'plot_keywords', 'genres', 'director']
-    for col in cols:
-        df[col] = df[col].astype(str)
-
-        #Concatenate the names in the director and title_cast columns
-
-    df.director = df.director.apply(lambda name: "".join(name.lower() for name in name.split()))
-    df.title_cast = df.title_cast.apply(lambda name: "".join(name.lower() for name in name.split()))
-
-        #Clean the rows of any special characters (|) and then fix the title cast column
-
-    df.title_cast = df.title_cast.map(lambda x: x.split('|')[:5])
-    df.title_cast = df.title_cast.apply(lambda x: " ".join(x))
-
-        #Clean the plot keywords the same way, retrieving the first five words again
-
-    df.plot_keywords= df.plot_keywords.map(lambda keyword: keyword.split('|')[:5])
-    df.plot_keywords = df.plot_keywords.apply(lambda keyword: " ".join(keyword))
-
-        #Cleaning the genres column
-
-    df.genres = df.genres.map(lambda word: word.lower().split('|'))
-    df.genres = df.genres.apply(lambda word: " ".join(word))
-
-        #Merge the columns for our vectorizer
-
-    df['word_bank'] = ''
-    word_bank = []
-
-    cols = ['title_cast', 'director', 'plot_keywords', 'genres']
-
-        #Generate the word_bank: ie. a list of words to feed into the vectorizer
-
-    for row in range(len(df)):
-        string_ = ''
-        for col in cols:
-            string_ += df.iloc[row][col] + " "        
-        word_bank.append(string_)
-
-        #Append wordbank list as a column to dataframe
-
-    df['word_bank'] = word_bank
-
-        #Drop the columns
-
-    df.drop(columns=['title_cast', 'director', 'plot_keywords', 'genres'], inplace=True)
-
-    #return df
-    
-    #pre_processed_df = word_bank_maker()
-    
-    # Split genre data into individual words.
-    #movies['keyWords'] = movies['genres'].str.replace('|', ' ')
-    # Subset of the data
-    movies_subset = df[:subset_size]
-    return movies_subset
+    movies['genres'] = movies['genres'].apply(str).apply(lambda x: x.split('|'))
+    return movies
 
 # !! DO NOT CHANGE THIS FUNCTION SIGNATURE !!
-# You are, however, encouraged to change its content.  
+# You are, however, encouraged to change its content.
 def content_model(movie_list,top_n=10):
-    """Performs Content filtering based upon a list of movies supplied
+    """
+    Performs Content filtering using a list of movies supplied
        by the app user.
-
     Parameters
     ----------
     movie_list : list (str)
-        Favorite movies chosen by the app user.
+        Favorite movies selected by the app user.
     top_n : type
-        Number of top recommendations to return to the user.
-
+        number of top recommendations to return to the user.
     Returns
     -------
     list (str)
         Titles of the top-n movie recommendations to the user.
-
     """
-    # Initializing the empty list of recommended movies
-    recommended_movies = []
-    data = data_preprocessing(1000)
-    # Instantiating and generating the count matrix
-    count_vec = CountVectorizer()
-    count_matrix = count_vec.fit_transform(data['word_bank'])
-    indices = pd.Series(data['title'])
-    cosine_sim = cosine_similarity(count_matrix, count_matrix)
-    # Getting the index of the movie that matches the title
-    idx_1 = indices[indices == movie_list[0]].index[0]
-    idx_2 = indices[indices == movie_list[1]].index[0]
-    idx_3 = indices[indices == movie_list[2]].index[0]
-    # Creating a Series with the similarity scores in descending order
-    rank_1 = cosine_sim[idx_1]
-    rank_2 = cosine_sim[idx_2]
-    rank_3 = cosine_sim[idx_3]
-    # Calculating the scores
-    score_series_1 = pd.Series(rank_1).sort_values(ascending = False)
-    score_series_2 = pd.Series(rank_2).sort_values(ascending = False)
-    score_series_3 = pd.Series(rank_3).sort_values(ascending = False)
-    # Getting the indexes of the 10 most similar movies
-    listings = score_series_1.append(score_series_1).append(score_series_3).sort_values(ascending = False)
+    #global movies
+    # removing the favorite movie list
+    movies_df = data_preprocessing(movies)
+    genre_list = []
+    for i in movie_list:
+        genre_list.append(list(movies_df[movies_df['title']==i]['genres'])[0])
 
-    # Store movie names
-    recommended_movies = []
-    # Appending the names of movies
-    top_50_indexes = list(listings.iloc[1:50].index)
-    # Removing chosen movies
-    top_indexes = np.setdiff1d(top_50_indexes,[idx_1,idx_2,idx_3])
-    for i in top_indexes[:top_n]:
-        recommended_movies.append(list(movies['title'])[i])
-    return recommended_movies
+
+
+    #instantiate the multilabelbinarizer for sparsity
+    mlb =  MultiLabelBinarizer()
+    mlb.fit_transform(genre_list)
+    genre_list = mlb.classes_
+    movies_df = movies_df[~movies_df['title'].isin(movie_list)] # remove selected movies
+    movie_genre = movies_df
+
+    #looping over genres for similarity
+    for i in genre_list:
+
+        movie_genre = movie_genre[movie_genre['bag_of_words'].str.contains(i)]
+
+        if len(movie_genre) <= top_n:
+
+            break
+
+        movie_genre_2 = movie_genre
+
+
+    movie_rating = ratings[ratings['movieId'].isin(movie_genre_2['movieId'].values)][['movieId', 'rating']]
+
+    top_movies = (movie_rating.groupby(['movieId']).mean().reset_index()).sort_values('rating', ascending =False)[:top_n]
+
+    return list((movies_df[movies_df['movieId'].isin(top_movies['movieId'].values)]['title']).values)
